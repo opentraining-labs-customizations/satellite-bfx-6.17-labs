@@ -1,0 +1,28 @@
+---
+- name: Grading playbook for SCENARIO_DNF
+  hosts: node1
+  gather_facts: no
+  tasks:
+
+
+        - name: Checking if required rpm is installed
+          ansible.builtin.shell: rpm -qa | grep katello | cut -c1-30
+          register: rpm
+
+        - name: Checking content source
+          ansible.builtin.shell: subscription-manager config | grep hostname | head -1 | cut -c15-25
+          register: content
+
+        - name: In case of success
+          ansible.builtin.debug:
+            msg: " Success!! Your alphanumeric code for completion is DNF26"
+          when: 
+               - rpm.stdout == "katello-pull-transport-migrate"
+               - content.stdout == "capsule.lab"
+
+        - name: In case of failure
+          ansible.builtin.debug:
+            msg: "Issue perists with required rpm or content source. Please try again"
+          when: rpm.stdout != "katello-pull-transport-migrate" or content.stdout != "capsule.lab"
+
+

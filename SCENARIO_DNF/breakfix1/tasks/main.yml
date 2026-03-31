@@ -1,0 +1,120 @@
+---
+# tasks file for breakfix0
+- name: Set initial facts
+  ansible.builtin.set_fact:
+    satellite_hostname: "{{ ansible_fqdn }}"
+
+- name: Read credentials
+  ansible.builtin.slurp:
+      path: /root/.hammer/cli.modules.d/foreman.yml  
+  register: slurp
+
+- name: Set credentials
+  set_fact:
+        password: "{{ (slurp.content | b64decode | from_yaml)[':foreman'][':password'] }}"
+        username: "{{ (slurp.content | b64decode | from_yaml)[':foreman'][':username'] }}"
+
+
+- name: capture capsule name
+  ansible.builtin.shell: hammer capsule list | awk -F'|' '$1+0>0 {gsub(/^ +| +$/, "", $2); print $2; exit}'
+  register: name
+
+- name: Set capsule name as fact
+  ansible.builtin.set_fact:
+      capsule_hostname: "{{ name.stdout}}"
+
+
+
+- name: Changing download policy for repo
+  ansible.builtin.command: hammer repository update --download-policy "immediate" --name "Red Hat Satellite Client 6 for RHEL 8 x86_64 RPMs" --product "Red Hat Enterprise Linux for x86_64" --organization "Default Organization"
+  
+- name : Sync the repo
+  ansible.builtin.command: bash -c "# hammer repository sync --name "Red Hat Satellite Client 6 for RHEL 8 x86_64 RPMs" --product "Red Hat Enterprise Linux for x86_64" --organization "Default Organization""
+
+
+- name: Change the download policy again
+  ansible.builtin.command: bash -c hammer repository update --download-policy "on_demand" --name "Red Hat Satellite Client 6 for RHEL 8 x86_64 RPMs" --product "Red Hat Enterprise Linux for x86_64" --organization "Default Organization"
+
+
+- name: Deleting artifacts
+  ansible.builtin.command: bash -c "rm -rf /var/lib/pulp/media/artifact/*"
+
+  
+- name: "Add a Test lifecycle environment"
+  theforeman.foreman.lifecycle_environment:
+    username: "{{ username }}"
+    password: "{{ password }}"
+    server_url: "https://{{ satellite_hostname }}"
+    name: "Test"
+    label: "Test"
+    organization: "Default Organization"
+    prior: "Library"
+    description: "The test environment"
+    state: "present"
+    validate_certs: false
+
+
+- name: Add lifecycle to Capsule
+  ansible.builtin.command: hammer capsule content add-lifecycle-environment --lifecycle-environment Test --id 2 --organization "Default Organization"
+
+- name: "Create cv1"
+  theforeman.foreman.content_view:
+    username: "{{ username }}"
+    password: "{{ password }}"
+    server_url: "https://{{ satellite_hostname }}"
+    name: "cv1"
+    organization: "{{ satellite_organization }}"
+    repositories:
+      - name: "Red Hat Satellite Client 6 for RHEL 8 x86_64 RPMs"
+        product: 'Red Hat Enterprise Linux for x86_64'
+      - name: 'Red Hat Enterprise Linux 8 for x86_64 - AppStream RPMs 8'
+        product: 'Red Hat Enterprise Linux for x86_64'
+      - name: 'Red Hat Enterprise Linux 8 for x86_64 - BaseOS RPMs 8'
+        product: 'Red Hat Enterprise Linux for x86_64'
+
+- name: "Publish a content view and promote that version to Library & Test, not idempotent"
+  theforeman.foreman.content_view_version:
+    username: "{{ username }}"
+    password: "{{ password }}"
+    server_url: "https://{{ satellite_hostname }}"
+    content_view: "cv1"
+    organization: "Default Organization"
+    lifecycle_environments:
+      - Library
+      - Test
+
+- name: Create client activation key
+  theforeman.foreman.activation_key:
+    server_url: "https://{{ satellite_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    validate_certs: false
+    name: ak1
+    organization: "{{ satellite_organization }}"
+    lifecycle_environment: "Test"
+    content_view: "cv1"
+  
+- name: Generate registration command to register the system with Satellite server
+  theforeman.foreman.registration_command:
+    server_url: "https://{{ satellite_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    validate_certs: false
+    setup_remote_execution: true
+    setup_insights: false
+    jwt_expiration: 8
+    force: true
+    insecure: true
+    activation_keys: "{{ activation_key }}"
+    organization: "{{ satellite_organization }}"
+    location: "{{ satellite_location }}"
+    smart_proxy: "{{ capsule_hostname }}"
+  register: global_reg_command
+
+- name: Regsiter the client host
+  ansible.builtin.command: bash -c "{{ global_reg_command['registration_command'] }}"
+    #delegate_to: "{{ groups['client'][0] }}"
+  delegate_to: node1
+  register: host_registration
+  when: global_reg_command is defined
+
