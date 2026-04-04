@@ -1,0 +1,89 @@
+---
+# tasks file for breakfix2
+- name: Set initial facts
+  ansible.builtin.set_fact:
+    satellite_hostname: "{{ ansible_fqdn }}"
+
+- name: Read credentials
+  slurp:
+      path: /root/.hammer/cli.modules.d/foreman.yml
+  register: slurp
+
+- name: Set credentials
+  set_fact:
+        password: "{{ (slurp.content | b64decode | from_yaml)[':foreman'][':password'] }}"
+        username: "{{ (slurp.content | b64decode | from_yaml)[':foreman'][':username'] }}"
+
+- name: Ensure satellite is running.
+  theforeman.foreman.status_info:
+    server_url: "https://{{ satellite_hostname }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    validate_certs: false
+  register: status_info
+
+- name: Define PostgreSQL paths
+  set_fact:
+    pg_data_dir: /var/lib/pgsql/data
+    pg_hba_file: /var/lib/pgsql/data/pg_hba.conf
+
+- name: Backup pg_hba.conf
+  copy:
+    src: "{{ pg_hba_file }}"
+    dest: "{{ pg_hba_file }}.bak"
+    remote_src: true
+  ignore_errors: true
+
+- name: Hard-break PostgreSQL access via pg_hba.conf
+  copy:
+    dest: "{{ pg_hba_file }}"
+    content: |
+      # This file is managed by Puppet. DO NOT EDIT.
+      # Rule Name: local access as postgres user for instance main
+      # Description: none
+      # Order: 1
+      host    all     all             0.0.0.0/0       reject
+      
+      # Rule Name: local access to database with same name for instance main
+      # Description: none
+      # Order: 2
+      local   all     all             ident
+      
+      # Rule Name: allow localhost TCP access to postgresql user for instance main
+      # Description: none
+      # Order: 3
+      host    all     postgres        127.0.0.1/32    scram-sha-256
+      
+      # Rule Name: deny access to postgresql user for instance main
+      # Description: none
+      # Order: 4
+      local   all     postgres                ident
+      
+      # Rule Name: allow access to all users for instance main
+      # Description: none
+      # Order: 100
+      host    all     all     127.0.0.1/32    scram-sha-256
+      
+      # Rule Name: allow access to ipv6 localhost for instance main
+      # Description: none
+      # Order: 101
+      host    all     all     ::1/128 scram-sha-256
+
+- name: Break PostgreSQL data directory ownership
+  file:
+    path: "{{ pg_data_dir }}"
+    owner: root
+    group: root
+    recurse: true
+
+- name: Make pg_hba.conf immutable
+  command: chattr +i {{ pg_hba_file }}
+  ignore_errors: true
+
+- name: Reboot the system
+  ansible.builtin.reboot:
+    reboot_timeout: 600
+
+
+
+
