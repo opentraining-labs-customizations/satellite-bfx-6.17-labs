@@ -111,7 +111,7 @@
     smart_proxy: "{{ capsule_hostname }}"
   register: global_reg_command
 
-- name: Regsiter the client host
+- name: Register the client host
   ansible.builtin.command: bash -c "{{ global_reg_command['registration_command'] }}"
     #delegate_to: "{{ groups['client'][0] }}"
   delegate_to: node1

@@ -10,7 +10,7 @@ What we essentially do by this ansible role is:
 * Does a rm -rf on /var/lib/pulp/media/artifacts/*
 * Creates a LCE and adds it to capsule.
 * Creates a cv for that LCE with the required repos and it gets automatically synced to capsule
-* Creates registration commande for a RHEL8 node to the capsule and registers it.
+* Creates registration command for a RHEL8 node to the capsule and registers it.
 
 
 Requirements
