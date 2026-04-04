@@ -1,0 +1,23 @@
+---
+- name: Grading playbook for SCENARIO_PGSQL
+  hosts: satellite
+  become: True
+  gather_facts: yes
+  tasks:
+
+    - name: Checking the status of the Satellite service using hammer ping
+      ansible.builtin.command: "hammer ping"
+      register: hammer_result
+      changed_when: false
+      ignore_errors: true
+
+    - name: Checking result
+      debug:
+        msg: "Success. your alphanumeric code for completion is PGSQL26"
+      when: ssl_error.rc == 0 and hammer_result.rc == 0
+
+    - name: In case of failure
+      debug:
+        msg: "Please try again"
+      when: ssl_error.rc != 0 or hammer_result.rc != 0
+
