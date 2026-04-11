@@ -1,0 +1,45 @@
+#!/bin/bash
+
+bold=`tput bold`
+normal=`tput sgr0`
+black=`tput setaf 0`
+red=`tput setaf 1`
+green=`tput setaf 2`
+yellow=`tput setaf 3`
+blue=`tput setaf 4`
+magenta=`tput setaf 5`
+cyan=`tput setaf 6`
+white=`tput setaf 7`
+
+# startup
+logger -p local0.notice "Initiating $0 with option(s) $@"
+echo "Initiating $0 with option(s) $@"
+
+breaks() {
+  ansible-playbook -i /opt/satellite-bfx-support/inventory /opt/satellite-bfx-support/$1.yml > /dev/null 2>&1
+}
+
+grade() {
+  ansible-playbook -i /opt/satellite-bfx-support/inventory /opt/satellite-bfx-support/$1.yml
+}
+
+if [ "$#" -ne 2 ] || ! [[ "$2" =~ ^(breakfix0|breakfix1|breakfix2|breakfix3|breakfix4|grade0|grade1|grade2|grade3|grade4)$ ]]; then
+  echo "Usage: $0 {break|grade} <breakfixN or gradeN>"
+  exit 2
+fi
+
+case "$1" in
+  break)
+   breaks $2
+		;;
+	 grade)
+		 grade $2
+		;;
+	*)
+		echo $"Usage: $0 {break|grade} <breakfixN or gradeN>"
+		exit 2
+esac
+
+logger -p local0.notice "Completed $0 with option(s) $@ successfully"
+echo "Completed $0 with option(s) $@ successfully"
+exit 0
