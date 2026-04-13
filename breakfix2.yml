@@ -1,6 +1,7 @@
 ---
 - name: Deploy ansible role breakfix2 on target systems
   hosts: satellite
+  become: true
   roles:
     - role: breakfix2
       tags: break
