@@ -2,9 +2,8 @@
 - name: Grading playbook for SCENARIO_DNF
   hosts: node1
   gather_facts: no
+  become: true
   tasks:
-
-
         - name: Checking if required rpm is installed
           ansible.builtin.shell: rpm -qa | grep katello | cut -c1-30
           register: rpm
