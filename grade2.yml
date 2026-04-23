@@ -4,13 +4,10 @@
   become: True
   gather_facts: yes
   tasks:
-
-    - name: Checking the status of the Satellite service using hammer ping
-      ansible.builtin.command: "hammer ping"
-      register: hammer_result
-      changed_when: false
-      ignore_errors: true
-
+    - name: Detecting health
+      ansible.builtin.command: bash -c "hammer --output=json ping  | jq -r '.[].candlepin.Status'"
+      register: health
+    
     - name: Checking result
       debug:
         msg: "Success. your alphanumeric code for completion is PGSQL26"
