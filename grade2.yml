@@ -1,20 +1,19 @@
 ---
-- name: Grading playbook for SCENARIO_PGSQL
+- name: Grading playbook for SCENARIO_CANDLEPIN
   hosts: satellite
-  become: True
-  gather_facts: yes
+  gather_facts: no
+  become: true
   tasks:
-    - name: Detecting health
-      ansible.builtin.command: bash -c "hammer --output=json ping  | jq -r '.[].candlepin.Status'"
-      register: health
-    
-    - name: Checking result
-      debug:
-        msg: "Success. your alphanumeric code for completion is PGSQL26"
-      when: ssl_error.rc == 0 and hammer_result.rc == 0
+        - name: Detecting health
+          ansible.builtin.command: bash -c "hammer --output=json ping  | jq -r '.[].candlepin.Status'"
+          register: health
 
-    - name: In case of failure
-      debug:
-        msg: "Please try again"
-      when: ssl_error.rc != 0 or hammer_result.rc != 0
+        - name: In case of success
+          ansible.builtin.debug:
+            msg: " Success!! Your alphanumeric code for completion is PGSQL26"
+          when: health.stdout == 'ok'
 
+        - name: In case of failure
+          ansible.builtin.debug:
+            msg: "Not all services are up, please try again"
+          when: health.stdout != 'ok'
